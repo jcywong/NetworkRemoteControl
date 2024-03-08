@@ -2,15 +2,11 @@
 modbus tcp 协议 网口远程控制 CX-5104E-L
 产品链接：http://www.corxnet.com/product/showproduct.php?id=132
 jcywong
-2024/03/05
+2024/03/06
 """
 import asyncio
 import pymodbus.client as modbusClient
-
-SLAVE = 0x01
-DOs = 4
-HOST = '192.168.2.50'  # 服务端 IP 地址
-PORT = 50000  # 服务端端口号
+from config import *
 
 
 def setup_async_client(host, port):
@@ -28,9 +24,9 @@ async def set_switch_control(client, do: int, isOn: bool):
     await client.connect()
     assert client.connected
     try:
-        if do not in range(1, DOs + 1):
+        if do not in range(1, RELAY_DOs + 1):
             raise ValueError("DO参数错误")
-        await client.write_coil(do - 1, isOn, slave=SLAVE)
+        await client.write_coil(do - 1, isOn, slave=RELAY_SLAVE)
     except Exception as e:
         print(f"set_switch_control:{e}")
         raise e
@@ -49,9 +45,9 @@ async def set_pulse_control(client, do: int, isOn: bool):
     await client.connect()
     assert client.connected
     try:
-        if do not in range(1, DOs + 1):
+        if do not in range(1, RELAY_DOs + 1):
             raise ValueError("DO参数错误")
-        await client.write_coil(0x3000 + do - 1, isOn, slave=SLAVE)
+        await client.write_coil(0x3000 + do - 1, isOn, slave=RELAY_SLAVE)
     except Exception as e:
         print(f"set_switch_control:{e}")
         raise e
@@ -70,9 +66,9 @@ async def set_pulse_control_with_time(client, do: int, time: int = 1000):
     await client.connect()
     assert client.connected
     try:
-        if do not in range(1, DOs + 1):
+        if do not in range(1, RELAY_DOs + 1):
             raise ValueError("DO参数错误")
-        await client.write_register(do - 1, time, slave=SLAVE)
+        await client.write_register(do - 1, time, slave=RELAY_SLAVE)
     except Exception as e:
         print(f"set_switch_control:{e}")
         raise e
@@ -90,9 +86,9 @@ async def set_reverse_control(client, do: int):
     await client.connect()
     assert client.connected
     try:
-        if do not in range(1, DOs + 1):
+        if do not in range(1, RELAY_DOs + 1):
             raise ValueError("DO参数错误")
-        await client.write_coil(0x5000 + do - 1, True, slave=SLAVE)
+        await client.write_coil(0x5000 + do - 1, True, slave=RELAY_SLAVE)
     except Exception as e:
         print(f"set_switch_control:{e}")
         raise e
@@ -111,9 +107,9 @@ async def set_all_switch_control(client, isOn: bool):
     assert client.connected
     try:
         if isOn:
-            await client.write_coil(0x0032, False, slave=SLAVE)
+            await client.write_coil(0x0032, False, slave=RELAY_SLAVE)
         else:
-            await client.write_coil(0x0033, False, slave=SLAVE)
+            await client.write_coil(0x0033, False, slave=RELAY_SLAVE)
     except Exception as e:
         print(f"set_switch_control:{e}")
         raise e
@@ -131,9 +127,9 @@ async def get_relay_statu(client, do: int):
     await client.connect()
     assert client.connected
     try:
-        if do not in range(1, DOs + 1):
+        if do not in range(1, RELAY_DOs + 1):
             raise ValueError("DO参数错误")
-        rr = await client.read_holding_registers(0x1000 + do - 1, slave=SLAVE)
+        rr = await client.read_holding_registers(0x1000 + do - 1, slave=RELAY_SLAVE)
         return rr.registers[0] == 1
     except Exception as e:
         print(f"set_switch_control:{e}")
@@ -150,9 +146,9 @@ async def get_all_relay_status(client):
     await client.connect()
     assert client.connected
     try:
-        rr = await client.read_coils(0, DOs, slave=SLAVE)
+        rr = await client.read_coils(0, RELAY_DOs, slave=RELAY_SLAVE)
         device_status = {}
-        for i in range(DOs):
+        for i in range(RELAY_DOs):
             print(f"relay{i + 1} state:{rr.bits[i]}")
             device_status[i + 1] = rr.bits[i]
         return device_status
@@ -164,7 +160,7 @@ async def get_all_relay_status(client):
 
 
 async def main():
-    test_client = setup_async_client(HOST, PORT)
+    test_client = setup_async_client(RELAY_HOST, RELAY_PORT)
     state = await get_all_relay_status(test_client)
     print(f"relay1 state:{state}")
 

@@ -1,5 +1,6 @@
 """
-通过tcp实现网口远程控制 CX-5104E-L
+通过tcp实现发送指令到ModbusTCP
+网口远程控制 CX-5104E-L
 产品链接：http://www.corxnet.com/product/showproduct.php?id=132
 jcywong
 2024/03/05
@@ -7,11 +8,8 @@ jcywong
 
 
 import socket
+from config import *
 
-IP = "192.168.2.50"
-PORT = 50000
-
-Address = 0x01
 
 FuncCode = {
     "AllRelayStatus": 0x01,  # 读取继电器状态指令-01功能码
@@ -26,7 +24,7 @@ FuncCode = {
 }
 
 
-def build_message(address: int, func_code: int, register_address: int, data: int) -> bytes:
+def pack_message(address: int, func_code: int, register_address: bytes, data: int) -> bytes:
     """
     创建6字节报文
     :param address:地址
@@ -38,7 +36,7 @@ def build_message(address: int, func_code: int, register_address: int, data: int
     message = bytearray([0x00, 0x00, 0x00, 0x00, 0x00, 0x06])  # 报文头
     message.append(address)  # 地址
     message.append(func_code)  # 功能码
-    message.extend(register_address.to_bytes(2, byteorder='big'))  # 寄存器地址
+    message.extend(register_address)  # 寄存器地址
     message.extend(data.to_bytes(2, byteorder='big'))  # 数据
     return message
 
@@ -70,23 +68,18 @@ def set_switch_control(do: int, isOn: bool):
     :param isOn:True-开 False-关
     :return:
     """
-    DOs = {
-        1: 0x0000,
-        2: 0x0001,
-        3: 0x0002,
-        4: 0x0003,
-    }
-    if do not in DOs:
+    if do not in range(RELAY_DOs + 1):
         print("DO参数错误")
         return
-    register_address = DOs[do]
+    register_address = (
+        bytes([a ^ b for a, b in zip((do-1).to_bytes(2, byteorder='big'), 0x0000.to_bytes(2, byteorder='big'))]))
     if isOn:
         data = 0xFF00
     else:
         data = 0x0000
     try:
-        ret = build_message(Address, FuncCode["SwitchControl"], register_address, data)
-        return send_command(IP, PORT, ret)
+        ret = pack_message(RELAY_SLAVE, FuncCode["SwitchControl"], register_address, data)
+        return send_command(RELAY_HOST, RELAY_PORT, ret)
     except Exception as e:
         print(f"SwitchControl:{e}")
         raise e
@@ -99,23 +92,18 @@ def set_pulse_control(do: int, isOn: bool):
     :param isOn:True-开 False-关
     :return:
     """
-    DOs = {
-        1: 0x3000,
-        2: 0x3001,
-        3: 0x3002,
-        4: 0x3003,
-    }
-    if do not in DOs:
+    if do not in range(RELAY_DOs + 1):
         print("DO参数错误")
         return
-    register_address = DOs[do]
+    register_address = (
+        bytes([a ^ b for a, b in zip((do-1).to_bytes(2, byteorder='big'), 0x3000.to_bytes(2, byteorder='big'))]))
     if isOn:
         data = 0xFF00
     else:
         data = 0x0000
     try:
-        ret = build_message(Address, FuncCode["PulseControl"], register_address, data)
-        return send_command(IP, PORT, ret)
+        ret = pack_message(RELAY_SLAVE, FuncCode["PulseControl"], register_address, data)
+        return send_command(RELAY_HOST, RELAY_PORT, ret)
     except Exception as e:
         print(f"PulseControl:{e}")
         raise e
@@ -128,19 +116,14 @@ def set_pulse_control_with_time(do: int, time: int = 1000):
     :param do:1-4路
     :return:
     """
-    DOs = {
-        1: 0x0000,
-        2: 0x0001,
-        3: 0x0002,
-        4: 0x0003,
-    }
-    if do not in DOs:
+    if do not in range(RELAY_DOs + 1):
         print("DO参数错误")
         return
-    register_address = DOs[do]
+    register_address = (
+        bytes([a ^ b for a, b in zip((do - 1).to_bytes(2, byteorder='big'), 0x0000.to_bytes(2, byteorder='big'))]))
     try:
-        ret = build_message(Address, FuncCode["PulseControlWithTime"], register_address, time)
-        return send_command(IP, PORT, ret)
+        ret = pack_message(RELAY_SLAVE, FuncCode["PulseControlWithTime"], register_address, time)
+        return send_command(RELAY_HOST, RELAY_PORT, ret)
     except Exception as e:
         print(f"PulseControlWithTime:{e}")
         raise e
@@ -153,20 +136,15 @@ def set_reverse_control(do: int):
     :return:
     """
 
-    DOs = {
-        1: 0x5000,
-        2: 0x5001,
-        3: 0x5002,
-        4: 0x5003,
-    }
-    if do not in DOs:
+    if do not in range(RELAY_DOs + 1):
         print("DO参数错误")
         return
-    register_address = DOs[do]
+    register_address = (
+        bytes([a ^ b for a, b in zip((do - 1).to_bytes(2, byteorder='big'), 0x5000.to_bytes(2, byteorder='big'))]))
     data = 0xFF00
     try:
-        ret = build_message(Address, FuncCode["ReverseControl"], register_address, data)
-        return send_command(IP, PORT, ret)
+        ret = pack_message(RELAY_SLAVE, FuncCode["ReverseControl"], register_address, data)
+        return send_command(RELAY_HOST, RELAY_PORT, ret)
     except Exception as e:
         print(f"ReverseControl:{e}")
         raise e
@@ -184,8 +162,8 @@ def set_all_switch_control(isOn: bool):
         register_address = 0x0033
     data = 0x0000
     try:
-        ret = build_message(Address, FuncCode["AllSwitchControl"], register_address, data)
-        return send_command(IP, PORT, ret)
+        ret = pack_message(RELAY_SLAVE, FuncCode["AllSwitchControl"], register_address.to_bytes(2, byteorder='big'), data)
+        return send_command(RELAY_HOST, RELAY_PORT, ret)
     except Exception as e:
         print(f"AllSwitchControl:{e}")
         raise e
@@ -197,20 +175,15 @@ def get_relay_statu(do: int):
     :param do:1-4路
     :return:
     """
-    DOs = {
-        1: 0x1000,
-        2: 0x1001,
-        3: 0x1002,
-        4: 0x1003,
-    }
-    if do not in DOs:
+    if do not in range(RELAY_DOs + 1):
         print("DO参数错误")
         return
-    register_address = DOs[do]
+    register_address = (
+        bytes([a ^ b for a, b in zip((do - 1).to_bytes(2, byteorder='big'), 0x1000.to_bytes(2, byteorder='big'))]))
     data = 0x0001
     try:
-        ret = build_message(Address, FuncCode["RelayStatu"], register_address, data)
-        response = send_command(IP, PORT, ret)
+        ret = pack_message(RELAY_SLAVE, FuncCode["RelayStatu"], register_address, data)
+        response = send_command(RELAY_HOST, RELAY_PORT, ret)
         last_byte = bytes.fromhex(response)[-1]
         if last_byte == 0:
             return False
@@ -231,8 +204,8 @@ def get_all_relay_status():
     register_address = 0x1000
     data = 0x0004  # 读取4路继电器状态
     try:
-        ret = build_message(Address, FuncCode["AllRelayStatus"], register_address, data)
-        response = send_command(IP, PORT, ret)
+        ret = pack_message(RELAY_SLAVE, FuncCode["AllRelayStatus"], register_address.to_bytes(2, byteorder='big'), data)
+        response = send_command(RELAY_HOST, RELAY_PORT, ret)
         last_Byte = bytes.fromhex(response)
         byte_list = bin(last_Byte[-1])[2:].zfill(4)
         device_status = {}
@@ -246,4 +219,4 @@ def get_all_relay_status():
 
 
 if __name__ == "__main__":
-    pass
+    print(get_all_relay_status())
