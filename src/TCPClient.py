@@ -19,7 +19,7 @@ FuncCode = {
     # "DelayedDisconnection": 0xD5,  # 延迟断开
     "ReverseControl": 0xF3,  # 继电器反转控制
     # "AllSwitchControl": 0x05,  # 继电器全开全关控制
-    "ReadSwitchStatus": 0xC3,  # 读取开关量状态
+    "AllSwitchStatus": 0xC3,  # 读取开关量状态
 }
 
 
@@ -171,7 +171,7 @@ def get_read_switch_status():
         date = unpack_message(response)
         if date:
             if (date["header"] == 0xAABB.to_bytes(2)
-                    and date["func_code"] == FuncCode["ReadSwitchStatus"].to_bytes(1)
+                    and date["func_code"] == FuncCode["AllSwitchStatus"].to_bytes(1)
                     and date["address"] == RELAY_SLAVE.to_bytes(1)):
                 switch_status = []
                 for i in range(6):
